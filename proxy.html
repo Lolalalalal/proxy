@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    
+    <title>Proxy for piao.qq.com</title>
+</head>
+<body>
+<script>
+    document.domain = "qq.com"; 
+	var createXHR = (function(){
+		var methods = [
+			function(){return new XMLHttpRequest();},
+			function(){return new ActiveXObject("Msxml2.XMLHTTP");},
+			function(){return new ActiveXObject("Microsoft.XMLHTTP");}
+		];
+		for(var i=0,len=methods.length;i<len;i++){
+			try{
+				methods[i]();
+			}
+			catch(e){
+				continue;
+			}
+			return methods[i];
+		}
+	})();	
+	
+    var ajax = function(uri, options){
+        var httpRequest,
+            httpSuccess,
+            timeout,
+            isTimeout=false,
+            isComplete=false;        
+        options = {
+            method: options.method || "GET",
+            data: options.data || null,
+            arguments: options.arguments || null,
+            onSuccess: options.onSuccess || function(){},
+            onError: options.onError || function(){},
+            onComplete: options.onComplete || function(){},            
+            onTimeout: options.onTimeout || function(){},
+            isAsync: (typeof options.isAsync == 'undefined'?true:options.isAsync),
+			cache: (typeof options.cache == 'undefined'?false:options.cache),
+            timeout: options.timeout ? options.timeout : 30000,
+            contentType: options.contentType ? options.contentType : "utf-8",
+            type: options.type || "xml"
+        };
+        uri = uri || "",
+        timeout = options.timeout;        
+        httpRequest = createXHR();//new window.XMLHttpRequest(); 
+        if(!options.cache){
+            uri += ((uri.indexOf('?') > -1?'&_':'?_')+Math.random());
+        }           
+        httpRequest.open(options.method, uri, options.isAsync);        
+		if(options.method.toUpperCase() == 'POST'){
+			httpRequest.setRequestHeader('Content-Type','application/x-www-form-urlencoded');				
+		}		
+		if(!options.cache){
+			httpRequest.setRequestHeader('If-Modified-Since', 'Thu, 1 Jan 1970 00:00:00 GMT');
+			httpRequest.setRequestHeader('Cache-Control', 'no-cache');	
+		}   
+        httpSuccess=function(r){
+            try{
+                return (!r.status && location.protocol == "file:")
+                    || (r.status>=200 && r.status<300)
+                    || (r.status==304)
+                    || (navigator.userAgent.indexOf("Safari")>-1 && typeof r.status=="undefined");
+            }catch(e){}
+            return false;
+        }
+        httpRequest.onreadystatechange=function (){
+            if(httpRequest.readyState==4){
+                if(!isTimeout){
+                    var o={},i,j;
+                        o.responseText = httpRequest.responseText;
+                        o.responseXML = httpRequest.responseXML;
+                        o.uri=uri;
+                        o.arguments=options.arguments;
+                        o.status= httpRequest.status;
+                        o.data = options.data;   
+					if(o.responseText.indexOf('frameElement.callback(') > -1){
+						o.responseText = o.responseText.substring(o.responseText.indexOf('callback(')+9,o.responseText.lastIndexOf(')'));
+					}
+                    if(httpSuccess(httpRequest)){                        
+                        try{
+                            if(options && options.onSuccess){
+                                options.onSuccess(o);
+                            }                            
+                        }catch(e){}   
+                    }else{                        
+                        try{
+                            options.onError(o);
+                        }catch(e){}
+                    }                    
+                    try{
+                        options.onComplete(o);
+                    }catch(e){}
+                }
+                isComplete = true;               
+                httpRequest = null;
+            }
+        };
+        
+        httpRequest.send(options.data);
+        
+        window.setTimeout(function(){
+            var o;
+            if(!isComplete){
+                isTimeout = true;
+                o={};
+                o.uri=uri;
+                o.arguments=options.arguments;
+                if(httpRequest){
+                    httpRequest.abort();
+                    httpRequest = null;
+                }
+                try{
+                    options.onTimeout(o);
+                    options.onComplete(o);
+                }catch(e){}
+            }
+        }, timeout);    
+        
+        return httpRequest;
+    };	
+	frameElement&& frameElement.proxyReady && frameElement.proxyReady(ajax);
+</script>
+
+
+</body></html>
